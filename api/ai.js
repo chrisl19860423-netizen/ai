@@ -24,8 +24,15 @@ const SYSTEM_PROMPTS = {
 
 /**
  * Parse request body (supports both JSON object and JSON string)
+ * Vercel 可能已经解析了 body，先检查 req.body
  */
 async function parseBody(req) {
+  // 如果 Vercel 已经解析了 body，直接返回
+  if (req.body) {
+    return typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  }
+  
+  // 否则手动解析流
   return new Promise((resolve, reject) => {
     let body = '';
     req.on('data', chunk => {
@@ -50,7 +57,8 @@ async function parseBody(req) {
  * Validate API key from request headers
  */
 function validateApiKey(req) {
-  const apiKey = req.headers['x-api-key'];
+  // Vercel 会将请求头转换为小写，支持多种格式
+  const apiKey = req.headers['x-api-key'] || req.headers['X-Api-Key'] || req.headers['X-API-Key'];
   const expectedKey = process.env.GATEWAY_API_KEY;
   
   if (!expectedKey) {
