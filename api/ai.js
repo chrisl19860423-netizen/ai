@@ -131,9 +131,9 @@ async function callUpstreamAPI(text, mode) {
 }
 
 /**
- * Main handler
+ * Main handler - Vercel Serverless Function
  */
-async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -213,7 +213,5 @@ async function handler(req, res) {
       detail: detail
     });
   }
-}
-
-module.exports = handler;
+};
 
