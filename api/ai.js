@@ -133,7 +133,7 @@ async function callUpstreamAPI(text, mode) {
 /**
  * Main handler
  */
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -214,4 +214,6 @@ module.exports = async function handler(req, res) {
     });
   }
 }
+
+module.exports = handler;
 
