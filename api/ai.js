@@ -25,28 +25,32 @@ const SYSTEM_PROMPTS = {
 /**
  * Parse request body (supports both JSON object and JSON string)
  */
-async function parseBody(request) {
-  try {
-    const text = await request.text();
-    if (!text) return null;
-    
-    // Try to parse as JSON
-    try {
-      return JSON.parse(text);
-    } catch {
-      // If already an object (shouldn't happen with fetch, but handle it)
-      return text;
-    }
-  } catch (error) {
-    return null;
-  }
+async function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      if (!body) {
+        resolve(null);
+        return;
+      }
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        resolve(body);
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 /**
  * Validate API key from request headers
  */
-function validateApiKey(request) {
-  const apiKey = request.headers.get('x-api-key');
+function validateApiKey(req) {
+  const apiKey = req.headers['x-api-key'];
   const expectedKey = process.env.GATEWAY_API_KEY;
   
   if (!expectedKey) {
@@ -129,42 +133,42 @@ async function callUpstreamAPI(text, mode) {
 /**
  * Main handler
  */
-export default async function handler(request) {
+module.exports = async function handler(req, res) {
+  // Set CORS headers
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+  
+  // Handle OPTIONS request for CORS
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
   // Only accept POST
-  if (request.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed. Only POST is supported.' }),
-      { 
-        status: 405,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed. Only POST is supported.' });
+    return;
   }
   
   // Validate API key
-  const authResult = validateApiKey(request);
+  const authResult = validateApiKey(req);
   if (!authResult.valid) {
-    return new Response(
-      JSON.stringify({ error: authResult.error }),
-      { 
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    res.status(401).json({ error: authResult.error });
+    return;
   }
   
   // Parse request body
   let body;
   try {
-    body = await parseBody(request);
+    body = await parseBody(req);
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid request body', detail: error.message.substring(0, 200) }),
-      { 
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    res.status(400).json({ 
+      error: 'Invalid request body', 
+      detail: error.message.substring(0, 200) 
+    });
+    return;
   }
   
   // Handle string body (parse as JSON)
@@ -172,74 +176,42 @@ export default async function handler(request) {
     try {
       body = JSON.parse(body);
     } catch {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON format in request body' }),
-        { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+      res.status(400).json({ error: 'Invalid JSON format in request body' });
+      return;
     }
   }
   
   // Validate required fields
   if (!body || typeof body !== 'object') {
-    return new Response(
-      JSON.stringify({ error: 'Request body must be a JSON object' }),
-      { 
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
   }
   
   const { text, mode } = body;
   
   if (!text || typeof text !== 'string') {
-    return new Response(
-      JSON.stringify({ error: 'Missing or invalid "text" field' }),
-      { 
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    res.status(400).json({ error: 'Missing or invalid "text" field' });
+    return;
   }
   
   if (!mode || !['idea', 'todo', 'daily'].includes(mode)) {
-    return new Response(
-      JSON.stringify({ error: 'Missing or invalid "mode" field. Must be one of: idea, todo, daily' }),
-      { 
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    res.status(400).json({ 
+      error: 'Missing or invalid "mode" field. Must be one of: idea, todo, daily' 
+    });
+    return;
   }
   
   // Call upstream API
   try {
     const reply = await callUpstreamAPI(text, mode);
-    
-    return new Response(
-      JSON.stringify({ reply }),
-      { 
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    res.status(200).json({ reply });
   } catch (error) {
     const errorMessage = error.message || 'Unknown error';
     const detail = errorMessage.substring(0, 300);
-    
-    return new Response(
-      JSON.stringify({ 
-        error: 'Failed to process AI request',
-        detail: detail
-      }),
-      { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    res.status(500).json({ 
+      error: 'Failed to process AI request',
+      detail: detail
+    });
   }
 }
 
