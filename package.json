@@ -1,0 +1,13 @@
+{
+  "name": "ai-siri-gateway",
+  "version": "1.0.0",
+  "description": "AI Gateway for HomePod/iPhone Shortcuts",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "keywords": ["vercel", "api", "ai", "gateway"],
+  "author": "",
+  "license": "MIT"
+}
+
