@@ -154,6 +154,24 @@ module.exports = async function handler(req, res) {
     return;
   }
   
+  // Allow GET for testing (return function info)
+  if (req.method === 'GET') {
+    res.status(200).json({ 
+      message: 'AI Gateway is working!',
+      endpoint: '/api/ai',
+      method: 'POST required',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': 'your-gateway-api-key'
+      },
+      body: {
+        text: 'string',
+        mode: 'idea|todo|daily'
+      }
+    });
+    return;
+  }
+  
   // Only accept POST
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed. Only POST is supported.' });
